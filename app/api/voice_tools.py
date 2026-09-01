@@ -72,8 +72,12 @@ def _dispatch_tool_call(session: Session, tool_call: VapiToolCall) -> Any:
         }
 
     if tool_call.name == "update_patient":
-        patient_id = UUID(str(tool_call.arguments.get("patient_id", "")))
-        fields = tool_call.arguments.get("fields")
+        arguments = dict(tool_call.arguments)
+        confirmed = arguments.get("confirmed", False)
+        if confirmed is not True:
+            raise ValueError("Explicit caller confirmation is required before updating")
+        patient_id = UUID(str(arguments.get("patient_id", "")))
+        fields = arguments.get("fields")
         patient_data = PatientUpdate.model_validate(fields)
         patient = update_patient(session, patient_id, patient_data)
         if patient is None:

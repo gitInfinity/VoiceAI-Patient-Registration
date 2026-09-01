@@ -62,9 +62,10 @@ def main() -> None:
     args = parse_args()
     settings = get_settings()
     configure_logging(settings.log_level)
-    tool_server_url = None
-    if settings.public_base_url is not None:
-        tool_server_url = f"{settings.public_base_url.rstrip('/')}/voice/tools"
+    if settings.public_base_url is None or settings.vapi_credential_id is None:
+        raise SystemExit("PUBLIC_BASE_URL and VAPI_CREDENTIAL_ID are required")
+
+    tool_server_url = f"{settings.public_base_url.rstrip('/')}/voice/tools"
     payload = build_assistant_config(
         tool_server_url=tool_server_url,
         credential_id=settings.vapi_credential_id,
@@ -77,11 +78,6 @@ def main() -> None:
 
     if settings.vapi_api_key is None:
         raise SystemExit("VAPI_API_KEY is required with --apply")
-    if tool_server_url is None or settings.vapi_credential_id is None:
-        raise SystemExit(
-            "PUBLIC_BASE_URL and VAPI_CREDENTIAL_ID are required with --apply"
-        )
-
     result = apply_assistant_config(
         api_key=settings.vapi_api_key.get_secret_value(),
         assistant_id=settings.vapi_assistant_id,

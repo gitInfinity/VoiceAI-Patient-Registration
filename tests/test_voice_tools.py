@@ -96,6 +96,25 @@ def test_create_requires_explicit_confirmation(client: TestClient) -> None:
     }
 
 
+def test_update_requires_explicit_confirmation(client: TestClient) -> None:
+    created = call_tool(client, "create_patient", patient_arguments())
+
+    result = call_tool(
+        client,
+        "update_patient",
+        {
+            "patient_id": created["patient"]["patient_id"],
+            "fields": {"city": "Albany"},
+            "confirmed": False,
+        },
+    )
+
+    assert result == {
+        "success": False,
+        "error": "Explicit caller confirmation is required before updating",
+    }
+
+
 def test_voice_tools_create_search_and_update_patient(client: TestClient) -> None:
     created = call_tool(client, "create_patient", patient_arguments())
     patient_id = created["patient"]["patient_id"]
@@ -108,7 +127,7 @@ def test_voice_tools_create_search_and_update_patient(client: TestClient) -> Non
     updated = call_tool(
         client,
         "update_patient",
-        {"patient_id": patient_id, "fields": {"city": "Albany"}},
+        {"patient_id": patient_id, "fields": {"city": "Albany"}, "confirmed": True},
     )
 
     assert created["success"] is True

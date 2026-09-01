@@ -1,47 +1,150 @@
 # Voice AI Patient Registration
 
-A FastAPI backend for a voice-based patient registration assessment. The REST API will validate and persist patient data, while Vapi will handle telephony and conversational voice behavior.
+A complete demonstration of phone-based patient registration using Vapi, FastAPI,
+SQLAlchemy, and PostgreSQL. The voice assistant gathers fake demographic data,
+reads it back for explicit confirmation, and invokes authenticated backend tools to
+search, create, or update a patient. The REST API can also be used independently.
 
-The backend currently provides validated patient CRUD operations with soft deletion. Voice integration will be added incrementally after backend deployment.
+> This is an assessment project, not a HIPAA-compliant clinical system. Use fake
+> patient information only.
 
-## Requirements
+## Live application
+
+- API: `https://intakemd.up.railway.app`
+- Interactive documentation: `https://intakemd.up.railway.app/docs`
+- Readiness check: `https://intakemd.up.railway.app/health`
+
+## How it works
+
+```text
+Caller
+  │ voice conversation
+  ▼
+Vapi assistant ── authenticated tool call ──► FastAPI
+                                                  │
+                                                  ▼
+                                          patient service
+                                                  │
+                                                  ▼
+                                         PostgreSQL / SQLite
+```
+
+Vapi owns telephony, transcription, speech synthesis, interruptions, and model tool
+selection. FastAPI remains the source of truth for validation and persistence; the
+language model never accesses the database directly.
+
+## Features
+
+- Natural, interruption-friendly collection of required and optional demographics
+- Caller corrections, out-of-order answers, draft reset, and focused clarification
+- Full readback and explicit confirmation before both create and update operations
+- Duplicate lookup by normalized US phone number
+- Backend validation for names, date of birth, sex, phone, state, ZIP, and email
+- UUID patient identifiers and UTC timestamps
+- PostgreSQL deployment with Alembic migrations; SQLite for local development
+- Filterable REST CRUD API with partial updates and soft deletion
+- Authenticated Vapi tools using a dedicated `X-Vapi-Secret` credential
+- Consistent response envelopes, correlation IDs, structured request logs, and safe
+  error handling that does not expose secrets or request bodies
+- Focused automated coverage for schemas, models, services, API behavior, migrations,
+  assistant configuration, and voice tools
+
+## Technology
 
 - Python 3.12+
-- [uv](https://docs.astral.sh/uv/)
+- FastAPI and Pydantic
+- SQLAlchemy 2 and Alembic
+- PostgreSQL in Railway; SQLite locally
+- Vapi for the voice assistant and function tools
+- pytest and HTTPX for testing
+- `uv` for dependency and environment management
 
-## Local setup
+## Repository layout
 
-Install dependencies:
+```text
+app/
+  api/                 REST and Vapi HTTP routes
+  db/                  engine, session, and database checks
+  models/              SQLAlchemy patient model
+  schemas/             external validation and response models
+  services/            patient persistence use cases
+  voice/               version-controlled assistant prompt and tool definitions
+  config.py             environment configuration
+  main.py               FastAPI application and exception handlers
+  observability.py      request IDs and logging configuration
+migrations/             Alembic environment and revisions
+scripts/configure_vapi.py
+tests/
+Dockerfile
+```
 
-```shell
+## Local development
+
+### Prerequisites
+
+- Python 3.12 or newer
+- [`uv`](https://docs.astral.sh/uv/)
+
+Clone the repository, create local configuration, install dependencies, migrate the
+database, and start the API:
+
+```powershell
+Copy-Item .env.example .env
 uv sync
-```
-
-Copy `.env.example` to `.env` if you want to override the local defaults, apply the database migration, then start the API:
-
-```shell
 uv run alembic upgrade head
-```
-
-```shell
 uv run uvicorn app.main:app --reload
 ```
 
-Open `http://127.0.0.1:8000/docs` for the generated API documentation or request the health endpoint:
+SQLite is used at `./voice_agent.db` unless `DATABASE_URL` is changed. Open
+`http://127.0.0.1:8000/docs` to exercise the API.
 
-```shell
-curl http://127.0.0.1:8000/health
+### Configuration
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATABASE_URL` | No locally | SQLAlchemy database URL; defaults to local SQLite |
+| `LOG_LEVEL` | No | Python logging level; defaults to `INFO` |
+| `VAPI_API_KEY` or `PRIVATE_VAPI_KEY` | For Vapi configuration | Private Vapi API key |
+| `VAPI_ASSISTANT_ID` | After assistant creation | Existing assistant to update |
+| `VAPI_TOOL_SECRET` | For voice tools | Random secret checked in `X-Vapi-Secret` |
+| `VAPI_CREDENTIAL_ID` | For Vapi configuration | Vapi Custom Credential ID containing the tool secret |
+| `PUBLIC_BASE_URL` | For Vapi configuration | Public API origin, without a trailing path |
+
+Generate the tool secret with:
+
+```powershell
+python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-## Tests
+Never commit `.env`. The repository ignores it and provides only safe placeholders
+in `.env.example`.
 
-```shell
-uv run pytest
+## REST API
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| `GET` | `/health` | Verifies the API and database connection |
+| `GET` | `/patients` | Lists active patients; supports exact filters |
+| `GET` | `/patients/{patient_id}` | Retrieves one active patient |
+| `POST` | `/patients` | Validates and creates a patient |
+| `PUT` | `/patients/{patient_id}` | Applies a validated partial update |
+| `DELETE` | `/patients/{patient_id}` | Soft-deletes a patient |
+| `POST` | `/voice/tools` | Executes authenticated Vapi tool calls |
+
+Patient list filters are `last_name`, `date_of_birth`, and `phone_number`. Normal
+reads exclude soft-deleted records. API responses use one envelope:
+
+```json
+{
+  "data": {},
+  "error": null
+}
 ```
 
-## Manual API verification
+Failures use an appropriate non-2xx status and place a safe message in `error`.
+Every response includes `X-Request-ID`; the same value appears in server logs.
 
-Start the server, then create a fake patient from another terminal:
+### Create a fake patient
 
 ```powershell
 $body = @{
@@ -56,88 +159,91 @@ $body = @{
     zip_code = "10001"
 } | ConvertTo-Json
 
-$created = Invoke-RestMethod `
+Invoke-RestMethod `
     -Method Post `
     -Uri http://127.0.0.1:8000/patients `
-    -ContentType "application/json" `
+    -ContentType application/json `
     -Body $body
-
-$created
-Invoke-RestMethod http://127.0.0.1:8000/patients
-Invoke-RestMethod "http://127.0.0.1:8000/patients?phone_number=212-555-0198"
 ```
 
-Every response includes `data` and `error`. Every HTTP response also includes an `X-Request-ID` header that can be matched to server logs. Request logs contain the HTTP method, path, status, duration, and correlation ID but intentionally omit bodies and query values.
+## Vapi setup
 
-SQLite is the local default. Deployment will set `DATABASE_URL` to PostgreSQL through environment configuration.
+The checked-in assistant definition contains the production conversation policy and
+three functions:
+
+- `search_patient_by_phone`
+- `create_patient`
+- `update_patient`
+
+Creation and update both require `confirmed=true`. The backend independently rejects
+either operation without explicit confirmation, even if the model invokes a tool
+incorrectly.
+
+1. Deploy the API and set a random `VAPI_TOOL_SECRET` in the application environment.
+2. In Vapi, create a Bearer Token Custom Credential with header `X-Vapi-Secret`, the
+   same raw token, and the Bearer prefix disabled.
+3. Set `PUBLIC_BASE_URL`, `VAPI_CREDENTIAL_ID`, and the private Vapi key in local
+   `.env`.
+4. Preview the assistant payload, then apply it:
+
+   ```powershell
+   uv run python -m scripts.configure_vapi
+   uv run python -m scripts.configure_vapi --apply
+   ```
+
+5. If the script creates an assistant, save the returned ID as
+   `VAPI_ASSISTANT_ID`. Future runs update that assistant instead of creating a
+   duplicate.
+6. Attach a Vapi or imported phone number to the assistant in the Vapi dashboard.
+
+The tool server URL is derived as `${PUBLIC_BASE_URL}/voice/tools`. Tool arguments and
+credentials are deliberately omitted from application logs.
 
 ## Railway deployment
 
-The repository includes a production `Dockerfile`. Railway detects a root-level Dockerfile automatically, so no legacy `railway.toml` or `railway.json` is needed.
-
-1. Push the repository to GitHub and create a Railway project.
-2. Add a managed PostgreSQL service to the project.
-3. Add an application service from the GitHub repository.
-4. In the application service's Variables tab, set:
-
-   ```text
-   DATABASE_URL=${{Postgres.DATABASE_URL}}
-   LOG_LEVEL=INFO
-   ```
-
-   If the database service has a different name, use that service name in the reference.
-
-5. Set the application's pre-deploy command to:
-
-   ```shell
-   alembic upgrade head
-   ```
-
-6. Set the health-check path to `/health` and a suitable timeout such as 120 seconds.
-7. Generate a public domain from the application's Networking settings.
-8. Verify `https://<generated-domain>/health`, `/docs`, and a fake patient CRUD flow.
-
-The Docker command binds Uvicorn to `0.0.0.0` and Railway's injected `PORT`. The application converts Railway-style `postgres://` or `postgresql://` URLs to SQLAlchemy's psycopg 3 dialect automatically.
-
-Do not expose the PostgreSQL service publicly for normal application operation. The application should use Railway's private service reference. Do not put database credentials or Vapi keys in repository files.
-
-## Vapi assistant bootstrap
-
-Phase 8 begins with a version-controlled assistant definition. Preview it without making an external change:
-
-```shell
-uv run python -m scripts.configure_vapi
-```
-
-After setting a private `VAPI_API_KEY`, create the assistant explicitly:
-
-```shell
-uv run python -m scripts.configure_vapi --apply
-```
-
-Save the returned ID as `VAPI_ASSISTANT_ID`. Subsequent `--apply` runs will update that assistant instead of creating another one.
-
-## Vapi backend tools
-
-The backend exposes one authenticated Vapi webhook at `POST /voice/tools`. It supports `search_patient_by_phone`, `create_patient`, and `update_patient`. Patient creation requires `confirmed=true`, providing a backend safeguard against saving before explicit caller confirmation.
-
-Use a dedicated random secret for tool calls; never reuse `PRIVATE_VAPI_KEY`. Configure the same value in two places:
-
-1. Set `VAPI_TOOL_SECRET` on the Railway application service.
-2. In Vapi, create a reusable Bearer Token Custom Credential with header name `X-Vapi-Secret` and Bearer prefix disabled. Store its ID as local `VAPI_CREDENTIAL_ID`.
-
-Also set these locally before applying the tool-enabled assistant configuration:
+The root `Dockerfile` starts Uvicorn on Railway's injected `PORT`. A recommended
+Railway application configuration is:
 
 ```text
-VAPI_ASSISTANT_ID=55b8bc8d-6736-466b-8ee3-846518b88441
-PUBLIC_BASE_URL=https://intakemd.up.railway.app
-VAPI_CREDENTIAL_ID=<credential-id-from-vapi>
+DATABASE_URL=${{Postgres.DATABASE_URL}}
+LOG_LEVEL=INFO
+VAPI_TOOL_SECRET=<random-dedicated-secret>
 ```
 
-After deploying the webhook and configuring the credential, attach the tools by running:
+Use the exact database service name in the reference. Configure this pre-deploy
+command so a migration failure stops the release cleanly:
 
 ```shell
-uv run python -m scripts.configure_vapi --apply
+alembic upgrade head
 ```
 
-Vapi sends tool calls to `/voice/tools` with the custom credential. The endpoint validates the request, invokes the existing patient service layer, and returns Vapi's `results` response format. It never logs tool arguments or the authentication secret.
+Set `/health` as the health-check path. Keep PostgreSQL private; the application
+uses Railway's internal service connection. `postgres://` and `postgresql://` URLs
+are normalized to SQLAlchemy's psycopg 3 driver automatically.
+
+## Verification
+
+Run all automated tests:
+
+```powershell
+uv run pytest
+```
+
+For an end-to-end voice check, call the attached number with fake details and test:
+
+1. A confirmed registration creates exactly one active row.
+2. Saying no at final confirmation creates no row.
+3. A repeated phone number is found before another create attempt.
+4. A correction is read back and only updates after explicit confirmation.
+5. A backend validation or availability failure is reported as an unsuccessful save.
+
+Confirm persisted results through `/docs` or `GET /patients`, then soft-delete any
+temporary records.
+
+## Safety and scope
+
+This repository intentionally avoids a custom speech stack and delegates voice
+infrastructure to Vapi. It does not implement production healthcare controls such as
+HIPAA compliance, identity verification, authorization roles, audit retention,
+encryption policy management, or consent workflows. Do not use it with real patient
+or protected health information.
