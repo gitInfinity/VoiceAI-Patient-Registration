@@ -168,6 +168,6 @@ def build_assistant_config(
             "voiceId": "Elliot",
         },
         "backgroundSound": "off",
-        "maxDurationSeconds": 900,
+        "maxDurationSeconds": 180,
         "voicemailDetection": "off",
     }
