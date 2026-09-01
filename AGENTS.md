@@ -35,6 +35,8 @@ When a small ambiguity exists, choose the simplest reasonable option. Ask before
 
 Refer to "IMPLEMENTATION.md" for phases of implementation.
 
+Update README.md whenever an architectural change is done. Always make sure readme reflects the the up-to-date state of the project.
+
 ---
 
 ## Priorities

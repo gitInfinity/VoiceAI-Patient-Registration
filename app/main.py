@@ -1,5 +1,5 @@
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from time import perf_counter
 from typing import Annotated
@@ -28,7 +28,7 @@ configure_logging(settings.log_level)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+async def lifespan(_: FastAPI) -> AsyncGenerator[None, None]:
     """Initialize resources needed by the API process."""
     check_database_connection()
     yield
