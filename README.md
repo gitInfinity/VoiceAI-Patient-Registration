@@ -66,7 +66,6 @@ their causes, and their resolutions:
 | Vapi reached `/voice/tools` but received `Invalid voice tool credentials` | The Custom Credential added `Bearer ` before the token, while the backend expected the raw `X-Vapi-Secret` value | Configured a Bearer Token credential with header `X-Vapi-Secret` and disabled the Bearer prefix |
 | Valid phone numbers were requested repeatedly after successful search calls | The webhook returned an object in `result`; Vapi custom tools require a single-line string result | Serialized every result as compact JSON text and added regression tests for the response type |
 | Tool calls displayed as completed but creation still returned `Request validation failed` | Vapi sent nested function calls with JSON-encoded arguments, while the webhook expected flattened dictionary arguments | Normalized Vapi's current nested payload and the compatible flattened `parameters` shape at the schema boundary |
-| The editor warned that the lifespan context manager return annotation was deprecated | An async context manager was annotated as an `AsyncIterator` | Changed the lifespan annotation to `AsyncGenerator[None, None]` |
 
 The phone-number issue was especially instructive: Vapi displayed the HTTP tool call
 as completed, but the model could not reliably consume its object-valued result.
