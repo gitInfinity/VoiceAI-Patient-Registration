@@ -87,13 +87,11 @@ The repository includes a production `Dockerfile`. Railway detects a root-level 
 
    If the database service has a different name, use that service name in the reference.
 
-5. Optionally set the application's pre-deploy command to:
+5. Set the application's pre-deploy command to:
 
    ```shell
    alembic upgrade head
    ```
-
-   The container also runs this migration command before Uvicorn as a safe fallback for the assessment's single application replica.
 
 6. Set the health-check path to `/health` and a suitable timeout such as 120 seconds.
 7. Generate a public domain from the application's Networking settings.
