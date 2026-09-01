@@ -1,6 +1,7 @@
+import json
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, model_validator
 
 
 def _to_camel(value: str) -> str:
@@ -14,6 +15,32 @@ class VapiToolCall(BaseModel):
     arguments: dict[str, Any]
 
     model_config = ConfigDict(extra="ignore")
+
+    @model_validator(mode="before")
+    @classmethod
+    def normalize_vapi_tool_call(cls, value: Any) -> Any:
+        """Accept both current nested Vapi calls and the legacy flattened shape."""
+        if not isinstance(value, dict):
+            return value
+
+        data = dict(value)
+        function = data.get("function")
+        if isinstance(function, dict):
+            data.setdefault("name", function.get("name"))
+            data.setdefault("arguments", function.get("arguments"))
+
+        if "arguments" not in data and "parameters" in data:
+            data["arguments"] = data["parameters"]
+
+        arguments = data.get("arguments")
+        if isinstance(arguments, str):
+            try:
+                data["arguments"] = json.loads(arguments)
+            except json.JSONDecodeError:
+                # Leave the invalid string in place so Pydantic returns a safe 422.
+                pass
+
+        return data
 
 
 class VapiToolCallMessage(BaseModel):

@@ -38,7 +38,14 @@ def tool_request(name: str, arguments: dict[str, object]) -> dict[str, object]:
         "message": {
             "type": "tool-calls",
             "toolCallList": [
-                {"id": "tool-call-1", "name": name, "arguments": arguments}
+                {
+                    "id": "tool-call-1",
+                    "type": "function",
+                    "function": {
+                        "name": name,
+                        "arguments": json.dumps(arguments),
+                    },
+                }
             ],
         }
     }
@@ -85,6 +92,29 @@ def test_voice_tool_endpoint_requires_authentication(client: TestClient) -> None
 
     assert response.status_code == 401
     assert response.json()["error"]["message"] == "Invalid voice tool credentials"
+
+
+def test_voice_tool_accepts_flattened_parameters_shape(client: TestClient) -> None:
+    response = client.post(
+        "/voice/tools",
+        json={
+            "message": {
+                "type": "tool-calls",
+                "toolCallList": [
+                    {
+                        "id": "tool-call-1",
+                        "name": "search_patient_by_phone",
+                        "parameters": {"phone_number": "2125550198"},
+                    }
+                ],
+            }
+        },
+        headers={"X-Vapi-Secret": "test-tool-secret"},
+    )
+
+    assert response.status_code == 200
+    result = json.loads(response.json()["results"][0]["result"])
+    assert result == {"success": True, "found": False, "patients": []}
 
 
 def test_create_requires_explicit_confirmation(client: TestClient) -> None:

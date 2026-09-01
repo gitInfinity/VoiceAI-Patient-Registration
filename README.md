@@ -49,6 +49,31 @@ language model never accesses the database directly.
 - Focused automated coverage for schemas, models, services, API behavior, migrations,
   assistant configuration, and voice tools
 
+## What I debugged
+
+Building the complete call path exposed several integration failures that were not
+visible when testing each component by itself. These were the significant problems,
+their causes, and their resolutions:
+
+| Symptom | Root cause | Resolution |
+| --- | --- | --- |
+| `/health` and `/docs` worked, but every patient route returned HTTP 500 | The application was running without the deployed patient table | Added an Alembic migration and configured `alembic upgrade head` as Railway's pre-deploy command |
+| Railway initially connected to SQLite instead of PostgreSQL | No PostgreSQL service existed in the Railway project, so the application used its local SQLite default | Added Railway PostgreSQL and connected the application through `DATABASE_URL` |
+| Deployment crashed with `Could not parse SQLAlchemy URL` | `${{Postgres.DATABASE_URL}}` referenced a nonexistent service and resolved to an empty value | Used the exact Railway database service name and verified that its `DATABASE_URL` variable existed |
+| A Docker startup change did not run in Railway | A Railway custom Start Command overrode the image command | Kept migrations in the pre-deploy command and used Uvicorn alone as the application Start Command |
+| `POST /voice/tools` did not appear in the public OpenAPI documentation | Railway was serving an older commit that did not include the voice router | Verified the deployed commit, redeployed, and confirmed router registration in `/docs` |
+| Vapi assistant configuration was rejected despite a valid private key | The Vapi API rejected the default script request identity | Added explicit JSON headers and a stable `User-Agent` to the configuration client |
+| Vapi reached `/voice/tools` but received `Invalid voice tool credentials` | The Custom Credential added `Bearer ` before the token, while the backend expected the raw `X-Vapi-Secret` value | Configured a Bearer Token credential with header `X-Vapi-Secret` and disabled the Bearer prefix |
+| Valid phone numbers were requested repeatedly after successful search calls | The webhook returned an object in `result`; Vapi custom tools require a single-line string result | Serialized every result as compact JSON text and added regression tests for the response type |
+| Tool calls displayed as completed but creation still returned `Request validation failed` | Vapi sent nested function calls with JSON-encoded arguments, while the webhook expected flattened dictionary arguments | Normalized Vapi's current nested payload and the compatible flattened `parameters` shape at the schema boundary |
+| The editor warned that the lifespan context manager return annotation was deprecated | An async context manager was annotated as an `AsyncIterator` | Changed the lifespan annotation to `AsyncGenerator[None, None]` |
+
+The phone-number issue was especially instructive: Vapi displayed the HTTP tool call
+as completed, but the model could not reliably consume its object-valued result.
+Testing the entire caller → Vapi → authenticated webhook → service → database path
+was necessary to distinguish transport success from a correctly interpreted tool
+response.
+
 ## Technology
 
 - Python 3.12+
