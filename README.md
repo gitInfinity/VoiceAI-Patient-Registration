@@ -115,4 +115,29 @@ After setting a private `VAPI_API_KEY`, create the assistant explicitly:
 uv run python -m scripts.configure_vapi --apply
 ```
 
-Save the returned ID as `VAPI_ASSISTANT_ID`. Subsequent `--apply` runs will update that assistant instead of creating another one. The bootstrap assistant intentionally has no backend tools and will never claim it saved a registration. Patient creation is connected in Phase 9.
+Save the returned ID as `VAPI_ASSISTANT_ID`. Subsequent `--apply` runs will update that assistant instead of creating another one.
+
+## Vapi backend tools
+
+The backend exposes one authenticated Vapi webhook at `POST /voice/tools`. It supports `search_patient_by_phone`, `create_patient`, and `update_patient`. Patient creation requires `confirmed=true`, providing a backend safeguard against saving before explicit caller confirmation.
+
+Use a dedicated random secret for tool calls; never reuse `PRIVATE_VAPI_KEY`. Configure the same value in two places:
+
+1. Set `VAPI_TOOL_SECRET` on the Railway application service.
+2. In Vapi, create a reusable Bearer Token Custom Credential with header name `X-Vapi-Secret` and Bearer prefix disabled. Store its ID as local `VAPI_CREDENTIAL_ID`.
+
+Also set these locally before applying the tool-enabled assistant configuration:
+
+```text
+VAPI_ASSISTANT_ID=55b8bc8d-6736-466b-8ee3-846518b88441
+PUBLIC_BASE_URL=https://intakemd.up.railway.app
+VAPI_CREDENTIAL_ID=<credential-id-from-vapi>
+```
+
+After deploying the webhook and configuring the credential, attach the tools by running:
+
+```shell
+uv run python -m scripts.configure_vapi --apply
+```
+
+Vapi sends tool calls to `/voice/tools` with the custom credential. The endpoint validates the request, invokes the existing patient service layer, and returns Vapi's `results` response format. It never logs tool arguments or the authentication secret.

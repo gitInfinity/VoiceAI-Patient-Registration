@@ -15,6 +15,9 @@ class Settings(BaseSettings):
         validation_alias=AliasChoices("VAPI_API_KEY", "PRIVATE_VAPI_KEY"),
     )
     vapi_assistant_id: str | None = None
+    vapi_tool_secret: SecretStr | None = None
+    vapi_credential_id: str | None = None
+    public_base_url: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=".env",

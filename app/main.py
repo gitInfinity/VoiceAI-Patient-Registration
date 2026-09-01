@@ -12,6 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.api.patients import router as patients_router
+from app.api.voice_tools import router as voice_tools_router
 from app.config import get_settings
 from app.db.session import check_database_connection, get_db
 from app.observability import (
@@ -40,6 +41,7 @@ app = FastAPI(
     lifespan=lifespan,
 )
 app.include_router(patients_router)
+app.include_router(voice_tools_router)
 
 
 @app.middleware("http")
