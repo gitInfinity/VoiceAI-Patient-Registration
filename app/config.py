@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import SecretStr, field_validator
+from pydantic import AliasChoices, Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -10,7 +10,10 @@ class Settings(BaseSettings):
     app_name: str = "Voice AI Patient Registration API"
     database_url: str = "sqlite:///./voice_agent.db"
     log_level: str = "INFO"
-    vapi_api_key: SecretStr | None = None
+    vapi_api_key: SecretStr | None = Field(
+        default=None,
+        validation_alias=AliasChoices("VAPI_API_KEY", "PRIVATE_VAPI_KEY"),
+    )
     vapi_assistant_id: str | None = None
 
     model_config = SettingsConfigDict(
