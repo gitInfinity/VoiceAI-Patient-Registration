@@ -34,7 +34,9 @@ def apply_assistant_config(
         data=json.dumps(payload).encode("utf-8"),
         headers={
             "Authorization": f"Bearer {api_key}",
+            "Accept": "application/json",
             "Content-Type": "application/json",
+            "User-Agent": "VoiceAgent-Configurator/0.1",
         },
         method=method,
     )
