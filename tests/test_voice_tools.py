@@ -1,3 +1,4 @@
+import json
 from collections.abc import Iterator
 
 import pytest
@@ -70,7 +71,10 @@ def call_tool(
     )
     assert response.status_code == 200
     assert response.json()["results"][0]["toolCallId"] == "tool-call-1"
-    return response.json()["results"][0]["result"]
+    serialized_result = response.json()["results"][0]["result"]
+    assert isinstance(serialized_result, str)
+    assert "\n" not in serialized_result
+    return json.loads(serialized_result)
 
 
 def test_voice_tool_endpoint_requires_authentication(client: TestClient) -> None:
@@ -131,6 +135,7 @@ def test_voice_tools_create_search_and_update_patient(client: TestClient) -> Non
     )
 
     assert created["success"] is True
+    assert search["success"] is True
     assert search["found"] is True
     assert search["patients"][0]["patient_id"] == patient_id
     assert updated["success"] is True

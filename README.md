@@ -197,7 +197,9 @@ incorrectly.
 6. Attach a Vapi or imported phone number to the assistant in the Vapi dashboard.
 
 The tool server URL is derived as `${PUBLIC_BASE_URL}/voice/tools`. Tool arguments and
-credentials are deliberately omitted from application logs.
+credentials are deliberately omitted from application logs. Responses use Vapi's
+required `results` envelope with each tool result serialized as a compact single-line
+JSON string.
 
 ## Railway deployment
 

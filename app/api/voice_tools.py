@@ -1,3 +1,4 @@
+import json
 import logging
 from secrets import compare_digest
 from typing import Annotated, Any
@@ -54,6 +55,7 @@ def _dispatch_tool_call(session: Session, tool_call: VapiToolCall) -> Any:
         )
         patients = list_patients(session, phone_number=filters.phone_number)
         return {
+            "success": True,
             "found": bool(patients),
             "patients": [_patient_json(patient) for patient in patients],
         }
@@ -118,6 +120,9 @@ def handle_vapi_tools(
             logger.exception("Vapi tool database failure name=%s", tool_call.name)
             result = {"success": False, "error": "Database operation failed"}
 
-        results.append(VapiToolResult(tool_call_id=tool_call.id, result=result))
+        serialized_result = json.dumps(result, separators=(",", ":"))
+        results.append(
+            VapiToolResult(tool_call_id=tool_call.id, result=serialized_result)
+        )
 
     return VapiToolResponse(results=results)

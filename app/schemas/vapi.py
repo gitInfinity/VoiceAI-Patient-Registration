@@ -31,7 +31,7 @@ class VapiToolRequest(BaseModel):
 
 class VapiToolResult(BaseModel):
     tool_call_id: str
-    result: Any
+    result: str
 
     model_config = ConfigDict(
         alias_generator=lambda value: _to_camel(value),
